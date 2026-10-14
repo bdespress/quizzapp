@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>{{ question }}</h1>
+        <form action="" onsubmit=Repondre(event)>
+            <input type="text" id="reponse">
+            </input>
+        </form>
+        <p id="message"></p>
+        <script>
+            const socket = new WebSocket("ws://192.168.1.118:8000/question/0/ws");
+            socket.onmessage = function(event){
+                document.getElementById("message").innerHTML += "<br>" + event.data
+            }
+            function Repondre(event){
+                const a_envoyer = document.getElementById("reponse")
+                socket.send(a_envoyer.value);
+                a_envoyer.value = ''
+                event.preventDefault()
+            }
+        </script>
+    </body>
+</html>

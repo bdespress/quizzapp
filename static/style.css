@@ -1,0 +1,79 @@
+html {
+    font-size: 40px;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background : linear-gradient(135deg,  #f4f7ff, #e8f3ff);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}     
+
+#accueil,
+#lancement, 
+#question,
+#correction,
+#scorefinal {
+    width: min(700px, 90vw);
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    padding: 30px;
+    text-align: center;
+    border: 1px solid #dfeaf9;
+}
+
+h1 {
+    color: #1f2d3d;
+    margin-bottom: 20px;
+    font-size: 1.5rem
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+}
+
+input[type="text"] {
+    width: 80%;
+    padding: 12px;
+    border: 1px solid #cddaf0;
+    border-radius: 10px;
+    font-size: 1rem;
+}
+
+button,
+input[type="submit"] {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: 0.2s ease;
+}
+
+button:hover,
+input[type="submit"]:hover {
+    background: #2563eb;
+}
+
+#correction {
+    text-align: left;
+}
+
+#boutonFaux {
+    background: #ef4444;
+}
+
+#boutonFaux.vrai_actif {
+    background: #22c55e;
+}
+
+/* #boutonFaux:hover {
+    background: #dc2626;
+} */

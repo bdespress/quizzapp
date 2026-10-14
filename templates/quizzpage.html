@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content"width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="/static/style.css">
+        <title>
+            Quizz Game
+        </title>
+    </head>
+    <body>
+        <div class="container1">
+        <div id="accueil">
+            <h1>Bienvenue sur mon jeu</h1>
+        
+            <form onsubmit="sendMessage('nom_joueur', 'Nom_joueur', event);showLancement()">
+                <label for="Nom_joueur"> Nom du joueur :</label> <input type="text" id="Nom_joueur"/>
+                <button> Rejoindre </button>
+            </form>
+        </div>
+
+        <div id="lancement" style="display:none;">
+            <h1>Bienvenue sur mon jeu</h1>
+        
+            <form onsubmit="Lancement_quizz(event)">
+                <input type="submit" value="prêt"/>
+            </form>
+        </div>
+        </div>
+
+        <div class="container2">
+        <div id="question" style="display:none;">
+            <h1 id="intitule_question"></h1>
+            <form action="" onsubmit="return false">
+                <input type="text" id="Reponse">
+                </input>
+            </form>
+        </div>
+
+        <div id="correction" style="display:none;">
+            <h1 id="question_affiche"></h1>
+            <p>Réponse attendue :  <span id="correction_affiche"></span></p>
+            <p>Réponse de <strong id="joueur_affiche"></strong> : <span id="reponse_affiche"></span></p>
+            <button id="boutonFaux" onclick="changementFaux()"> Faux </button>
+            <button onclick="next(event)"> suivant </button>
+        </div>
+
+        <div id="scorefinal" style="display:none;">
+            <h1>Scores</h1>
+            <ul id="score_list"></ul>
+        </div>
+        </div>
+
+        <script>
+            const socket = new WebSocket((location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/ws");
+            let joueurIndex = 0;
+            let estFaux = true;
+            socket.onmessage = function(event){
+                msg = JSON.parse(event.data)
+                if (msg.type === "show_question"){
+                    showQuestion(msg.data)
+                }
+                if (msg.type === "fin_quizz") {
+                    showCorrection(msg)
+                }
+                if (msg.type === "get_reponse") {
+                    sendMessage("reponse", "Reponse")
+                }
+                if (msg.type === "score_final") {
+                    showScorefinal(msg.data)
+                }
+            }
+            function sendMessage(type, ID, event = null){
+                const DATA = document.getElementById(ID)
+                socket.send(JSON.stringify({
+                    "type" : type,
+                    "data" : DATA.value}));
+                if (event) event.preventDefault();
+            }
+            function Lancement_quizz(event){
+                socket.send(JSON.stringify({
+                    type : "start_quizz",
+                    data : ""}));
+                event.preventDefault();
+            }
+            function showAccueil(){
+                document.getElementById("accueil").style.display = "block"
+                document.getElementById("lancement").style.display = "none"
+                document.getElementById("question").style.display = "none"
+                document.getElementById("correction").style.display = "none"
+                document.getElementById("scorefinal").style.display = "none"
+            
+            }
+            function showLancement(){
+                document.getElementById("accueil").style.display = "none"
+                document.getElementById("lancement").style.display = "block"
+                document.getElementById("question").style.display = "none"
+                document.getElementById("correction").style.display = "none"
+                document.getElementById("scorefinal").style.display = "none"
+            }
+            function showQuestion(data){
+                document.getElementById("accueil").style.display = "none"
+                document.getElementById("lancement").style.display = "none"
+                document.getElementById("question").style.display = "block"
+                document.getElementById("correction").style.display = "none"
+                document.getElementById("scorefinal").style.display = "none"
+                const input = document.getElementById("Reponse");
+                if (input) input.value = "";
+                document.getElementById("intitule_question").textContent = data
+            }
+            function showCorrection(msg){
+                document.getElementById("accueil").style.display = "none"
+                document.getElementById("lancement").style.display = "none"
+                document.getElementById("question").style.display = "none"
+                document.getElementById("correction").style.display = "block"
+                document.getElementById("scorefinal").style.display = "none"
+                document.getElementById("question_affiche").textContent = msg.data.question
+                document.getElementById("correction_affiche").textContent = msg.data.correction
+                document.getElementById("joueur_affiche").textContent = msg.nom_joueur
+                document.getElementById("reponse_affiche").textContent = msg.rep_joueur
+            }
+            function showScorefinal(scores){
+                document.getElementById("accueil").style.display = "none"
+                document.getElementById("lancement").style.display = "none"
+                document.getElementById("question").style.display = "none"
+                document.getElementById("correction").style.display = "none"
+                document.getElementById("scorefinal").style.display = "block"
+                document.getElementById("score_list").textContent = scores
+            }
+                function next(event){
+                socket.send(JSON.stringify({
+                type: "next",
+                data: !estFaux
+                }));
+                if (event) event.preventDefault();
+                estFaux = true;
+                const bouton = document.getElementById("boutonFaux");
+                bouton.textContent = estFaux ? "Faux" : "Vrai";
+                bouton.classList.remove("vrai_actif")
+            }
+            function changementFaux(){
+                estFaux = !estFaux;
+                const bouton = document.getElementById("boutonFaux");
+                bouton.textContent = estFaux ? "Faux" : "Vrai";
+                bouton.classList.toggle("vrai_actif", !estFaux)
+            }
+        </script>
+    </body>
+</html>
