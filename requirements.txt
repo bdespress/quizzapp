@@ -1,4 +1,5 @@
 fastapi[standard]
 uvicorn
 jinja2
+itsdangerous
 python-multipart
