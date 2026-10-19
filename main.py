@@ -35,6 +35,12 @@ class GameManager: # variables d'une partie
         self.question_index : int=0
         self.correction_index : int=0
         self.joueur_index : int=0
+    def reset(self):
+        self.quizz_started = False
+        self.liste_joueurs : list = []
+        self.question_index : int=0
+        self.correction_index : int=0
+        self.joueur_index : int=0
 
 class EtatJoueur: # données d'un joueur
     def __init__(self):
@@ -83,6 +89,7 @@ async def websocket_endpoint(socket: WebSocket):
                 joueur.nom = message["data"]
                 game.liste_joueurs.append(joueur)
             if message["type"] == "start_quizz" and not game.quizz_started:   # Démarre le quizz
+                game.reset()
                 game.quizz_started = True
                 asyncio.create_task(envoyer_quest_suiv(game, db, gest_connection))
             if message["type"] == "reponse":    # Reçoit une réponse
@@ -103,6 +110,7 @@ async def websocket_endpoint(socket: WebSocket):
                         for j in game.liste_joueurs :
                             scores += f"\n{j.nom} : {j.score}pts"     
                         await gest_connection.JSON_general({"type" : "score_final", "data" : scores})
+                        game.reset()
 
     except:
         gest_connection.disconnect(socket)
