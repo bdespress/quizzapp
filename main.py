@@ -8,6 +8,9 @@ import json
 import asyncio
 from fastapi.staticfiles import StaticFiles
 import sqlite3
+import os
+import json
+import gspread
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="bizarre") # Je comprends pas cette ligne
@@ -49,21 +52,25 @@ class EtatJoueur: # données d'un joueur
         self.reponses: list = []
         self.score : int = 0
 
-def get_database():      # récupère les questions du fichier SQLite
-    con = sqlite3.connect("database.db")
-    con.row_factory = sqlite3.Row
-    rows = con.execute('''SELECT intitule, correction
-                            FROM questions WHERE visible=1
-                            ORDER BY numero''').fetchall()
-    return [
-            {"question": row["intitule"], "correction": row["correction"]}
-            for row in rows
-            ]
+#
+def get_database():      # récupère les questions du googlesheet
+    credentials_json = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]    # clef de connection au googlesheet caché en variable d'environnement
+    credentials_dict = json.loads(credentials_json)     # transforme la clef JSON en dictionnaire
+
+    gc = gspread.service_account_from_dict(credentials_dict)
+    googlesheet = gc.open('questions_excel')        # accède au fichier 
+    sheet = googlesheet.worksheet("Feuille 1")      # accède à la feuille
+    all = sheet.get_all_records()              # récupère les données sous forme de dictionnaire
+    questions_actives = []
+    for row in all:
+        if row.get("visible") == 1 and row.get("intitule"):
+            questions_actives.append(row) 
+    return questions_actives
 
 # Envoi la question aux joueurs et recupère les réponses à la fin du chrono
 async def envoyer_quest_suiv(game, database, gest_connection) :
     while game.question_index < len(database):
-        await gest_connection.JSON_general({"type" : "show_question", "data" : database[game.question_index]["question"]})
+        await gest_connection.JSON_general({"type" : "show_question", "data" : {"intitule" : database[game.question_index]["intitule"], "image" : database[game.question_index]["image"]}})
         await asyncio.sleep(15)
         await gest_connection.JSON_general({"type" : "get_reponse"})
         await asyncio.sleep(0.1)
@@ -76,10 +83,6 @@ gest_connection = GestConnection()
 game = GameManager()
 
 templates = Jinja2Templates(directory='templates')
-
-# Base des questions / corrections
-db = get_database()
-
 
 @app.get("/")
 def home(request: Request):
@@ -97,6 +100,7 @@ async def websocket_endpoint(socket: WebSocket):
                 joueur.nom = message["data"]
                 game.liste_joueurs.append(joueur)
             if message["type"] == "start_quizz" and not game.quizz_started:   # Démarre le quizz
+                db = get_database()     # charge la base des questions / corrections
                 game.quizz_started = True
                 asyncio.create_task(envoyer_quest_suiv(game, db, gest_connection))
             if message["type"] == "reponse":    # Reçoit une réponse

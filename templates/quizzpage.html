@@ -29,6 +29,7 @@
 
         <div class="container2">
         <div id="question" style="display:none;">
+            <img id="image_question" src="" alt="Question image" style="display:block;">
             <h1 id="intitule_question"></h1>
             <form action="" onsubmit="return false">
                 <input type="text" id="Reponse">
@@ -37,7 +38,8 @@
         </div>
 
         <div id="correction" style="display:none;">
-            <h1 id="question_affiche"></h1>
+            <h1> Correction </h1>
+            <h2 id="question_affiche"></h2>
             <p>Réponse attendue :  <span id="correction_affiche"></span></p>
             <p>Réponse de <strong id="joueur_affiche"></strong> : <span id="reponse_affiche"></span></p>
             <button id="boutonFaux" onclick="changementFaux()"> Faux </button>
@@ -105,7 +107,16 @@
                 document.getElementById("scorefinal").style.display = "none"
                 const input = document.getElementById("Reponse");
                 if (input) input.value = "";
-                document.getElementById("intitule_question").textContent = data
+                document.getElementById("intitule_question").textContent = data.intitule
+                const image = document.getElementById("image_question")
+                if (data.image) {
+                    image.src = data.image;
+                    image.style.display = "block";
+                } else {
+                    image.src = "";
+                    image.style.display = "none";
+                }
+                console.log("image reçue =", data.image);
             }
             function showCorrection(msg){
                 document.getElementById("accueil").style.display = "none"
@@ -113,7 +124,7 @@
                 document.getElementById("question").style.display = "none"
                 document.getElementById("correction").style.display = "block"
                 document.getElementById("scorefinal").style.display = "none"
-                document.getElementById("question_affiche").textContent = msg.data.question
+                document.getElementById("question_affiche").textContent = msg.data.intitule
                 document.getElementById("correction_affiche").textContent = msg.data.correction
                 document.getElementById("joueur_affiche").textContent = msg.nom_joueur
                 document.getElementById("reponse_affiche").textContent = msg.rep_joueur

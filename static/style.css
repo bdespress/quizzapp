@@ -1,5 +1,5 @@
 html {
-    font-size: 40px;
+    font-size: 30px;
 }
 
 body {
@@ -28,6 +28,12 @@ h1 {
     color: #1f2d3d;
     margin-bottom: 20px;
     font-size: 1.5rem
+}
+
+h2 {
+    color: #1f2d3d;
+    margin-bottom: 20px;
+    font-size: 1.3rem
 }
 
 form {
@@ -74,6 +80,15 @@ input[type="submit"]:hover {
     background: #22c55e;
 }
 
-/* #boutonFaux:hover {
-    background: #dc2626;
-} */
+#question {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#image_question {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto 20px auto;
+}
