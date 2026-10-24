@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Form, Request, HTTPException, WebSocket
+from fastapi import FastAPI, Form, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import List, Optional
@@ -11,26 +11,47 @@ import sqlite3
 import os
 import json
 import gspread
+import logging
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="bizarre") # Je comprends pas cette ligne
 app.mount("/static", StaticFiles(directory="static"), name="static")
- 
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class GestConnection: # Gestion des websocket
     def __init__(self):
-        self.connections : list[WebSocket] = []
+        self.connections : set[WebSocket] = set()
+        self.lock = asyncio.Lock()
     async def connect(self, socket: WebSocket):
         await socket.accept()
-        self.connections.append(socket)
-    def disconnect(self, socket: WebSocket):
-        self.connections.remove(socket)
+        async with self.lock:
+            self.connections.add(socket)
+    async def disconnect(self, socket: WebSocket):
+        async with self.lock:
+            self.connections.discard(socket)
     async def JSON_perso(self, socket: WebSocket, message):
-        await socket.send_json(message)
+        try:
+            await asyncio.wait_for(socket.send_json(message), timeout=5)
+        except (WebSocketDisconnect, RuntimeError, asyncio.TimeoutError):
+            logger.warning("Echec d'envoi à un client")
     async def JSON_general(self, message):
-        for client in self.connections:
-            await client.send_json(message)
-    def socket_index(self, socket: WebSocket):
-        return self.connections.index(socket)+1
+        async with self.lock:
+            clients = list(self.connections)
+        async def envoyer(client):
+            try:
+                await asyncio.wait_for(client.send_json(message), timeout=5)
+                return None
+            except (WebSocketDisconnect, RuntimeError, asyncio.TimeoutError) as e:
+                logger.warning("Client déconnecté ou bloqué : %s", e)
+                return client
+            except Exception:
+                logger.exception("Erreur lors de l'envoi à un client")
+        resultats = await asyncio.gather(*(envoyer(client) for client in clients))
+        for client in resultats:
+            if client is not None:
+                await self.disconnect(client)
 
 class GameManager: # variables d'une partie
     def __init__(self):
@@ -39,12 +60,15 @@ class GameManager: # variables d'une partie
         self.question_index : int=0
         self.correction_index : int=0
         self.joueur_index : int=0
+        self.database : list = []
+        self.lock = asyncio.Lock()
     def reset(self):
         self.quizz_started = False
         self.liste_joueurs : list = []
         self.question_index : int=0
         self.correction_index : int=0
         self.joueur_index : int=0
+        self.database : list = []
 
 class EtatJoueur: # données d'un joueur
     def __init__(self):
@@ -100,9 +124,12 @@ async def websocket_endpoint(socket: WebSocket):
                 joueur.nom = message["data"]
                 game.liste_joueurs.append(joueur)
             if message["type"] == "start_quizz" and not game.quizz_started:   # Démarre le quizz
-                db = get_database()     # charge la base des questions / corrections
+                game.database = get_database()     # charge la base des questions / corrections
+                if not game.database:
+                    await gest_connection.JSON_general({"type": "erreur", "data": "Aucune question disponible"})
+                    continue
                 game.quizz_started = True
-                asyncio.create_task(envoyer_quest_suiv(game, db, gest_connection))
+                asyncio.create_task(envoyer_quest_suiv(game, game.database, gest_connection))
             if message["type"] == "reponse":    # Reçoit une réponse
                 joueur.reponses.append(message["data"])
             if message["type"] == "next":   # Passe à la correction suivante
@@ -110,12 +137,12 @@ async def websocket_endpoint(socket: WebSocket):
                     game.liste_joueurs[game.joueur_index].score += 1
                 if game.joueur_index < len(game.liste_joueurs)-1 :
                     game.joueur_index +=1
-                    await gest_connection.JSON_general({"type" : "fin_quizz", "data" : db[game.correction_index], "nom_joueur" : game.liste_joueurs[game.joueur_index].nom, "rep_joueur" : game.liste_joueurs[game.joueur_index].reponses[game.correction_index]})
+                    await gest_connection.JSON_general({"type" : "fin_quizz", "data" : game.database[game.correction_index], "nom_joueur" : game.liste_joueurs[game.joueur_index].nom, "rep_joueur" : game.liste_joueurs[game.joueur_index].reponses[game.correction_index]})
                 else :
-                    if game.correction_index < len(db)-1:
+                    if game.correction_index < len(game.database)-1:
                         game.joueur_index = 0
                         game.correction_index += 1
-                        await gest_connection.JSON_general({"type" : "fin_quizz", "data" : db[game.correction_index], "nom_joueur" : game.liste_joueurs[game.joueur_index].nom, "rep_joueur" : game.liste_joueurs[game.joueur_index].reponses[game.correction_index]})
+                        await gest_connection.JSON_general({"type" : "fin_quizz", "data" : game.database[game.correction_index], "nom_joueur" : game.liste_joueurs[game.joueur_index].nom, "rep_joueur" : game.liste_joueurs[game.joueur_index].reponses[game.correction_index]})
                     else :
                         scores = ""
                         for j in game.liste_joueurs :
@@ -123,5 +150,11 @@ async def websocket_endpoint(socket: WebSocket):
                         await gest_connection.JSON_general({"type" : "score_final", "data" : scores})
                         game.reset()
 
-    except:
-        gest_connection.disconnect(socket)
+    except WebSocketDisconnect:
+        logger.info("Un joueur s'est déconnecté")
+    except json.JSONDecodeError:
+        logger.warning("Message JSON invalide reçu")
+    except Exception:
+        logger.exception("Erreur dans le traitement WebSocket")
+    finally:
+        await gest_connection.disconnect(socket)
