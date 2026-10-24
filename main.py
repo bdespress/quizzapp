@@ -95,7 +95,7 @@ def get_database():      # récupère les questions du googlesheet
 async def envoyer_quest_suiv(game, database, gest_connection) :
     while game.question_index < len(database):
         await gest_connection.JSON_general({"type" : "show_question", "data" : {"intitule" : database[game.question_index]["intitule"], "image" : database[game.question_index]["image"]}})
-        await asyncio.sleep(5)
+        await asyncio.sleep(30)
         await gest_connection.JSON_general({"type" : "get_reponse"})
         await asyncio.sleep(0.1)
         game.question_index += 1 
